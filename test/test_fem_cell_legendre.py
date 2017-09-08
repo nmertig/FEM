@@ -207,9 +207,9 @@ if __name__ == '__main__':
     smin =-0.035
     smax = 1.045
     plot(max_order=10, smin=smin, smax=smax)
-    #test_analytic_Matrix_Elements(max_order=20, smin=smin, smax=smax)
-    #test_potential_Matrix_Elements1(max_order=20, smin=smin, smax=smax)
-    #test_potential_Matrix_Elements2()
-    #test_K_matrix1()
-    #test_K_matrix2()
-    #test_K_matrix3()
+    test_analytic_Matrix_Elements(max_order=20, smin=smin, smax=smax)
+    test_potential_Matrix_Elements1(max_order=20, smin=smin, smax=smax)
+    test_potential_Matrix_Elements2()
+    test_K_matrix1()
+    test_K_matrix2()
+    test_K_matrix3()

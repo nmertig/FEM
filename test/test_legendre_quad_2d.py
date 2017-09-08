@@ -11,7 +11,7 @@ from scipy.special import erf
 from FEM.core.legendre_quad_2d import LegendreQuad2d
 
 # --------------------------------------------------------------------------
-#Tests
+# Tests
 
 class HelpTesting(object):
     """ Visualizes the results of numerical integration.
