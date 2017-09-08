@@ -367,3 +367,115 @@ class FEMKicked(FEM):
         UT = np.dot(RT, np.dot(np.diag(exp_T), np.dot(LT, self.O)))
         print("Propagator error", abs(UT_red - UT).max())
         self.UT = UT
+
+    # FIXME: The part below is not very stable and just kept here for my
+    # personal memory. The problem was that the computation of UV_half from
+    # a diagonalization of V is not quite accurate. using the setup from
+    # integration is recommended instead
+    def setup_U_te(self, degree=None, reduced=False):
+        """ sets up UT, UV_half and U via time-evolution method
+        since the UV_half method is highly inaccurate it's use is not
+        recommended.
+        """
+        self.setup_O()
+        print("------------------------------------------------")
+        print("set up of UT")
+        self.setup_T()
+        # diagonalizing T
+        ET, LT, RT = eig(self.T, b=self.O, left=True, right=True)
+        LT = LT.transpose().conjugate()
+        exp_T = np.exp(-1j*ET / self.hbar)
+        # order according to absolute value:
+        i_sort = np.argsort(-abs(exp_T))
+        exp_T = exp_T[i_sort]
+        RT = RT[:,i_sort]
+        LT = LT[i_sort,:]
+        # normalize and test decomposition
+        RT, LT = self.normalize_RL_to_O(RT, LT)
+        self.test_normalization_RL_to_O(RT, LT)
+        # put forth UT
+        self.UT = np.dot(RT, np.dot(np.diag(exp_T), np.dot(LT, self.O)))
+
+        # define the reduced eigenspace space of T --------------
+        # here the key point is that T has many eigenvectors which decay
+        # extremely fast. We want to rempve them by explicit projection
+        # the label _red denotes an operator in the reduced eigenbasis of T
+        print("maximal eigenvalue of UT:", abs(exp_T).max())
+        print("minimal eigenvalue of UT:", abs(exp_T).min())
+        if reduced:
+            max_mode = len(np.where(abs(exp_T)>10**(-15))[0])
+            print("necessary directions", max_mode)
+        else:
+            # include all states
+            max_mode = len(ET)
+        UT_red = np.diag(exp_T[:max_mode])
+
+        # set up UV ---------------------------------------------
+        print("------------------------------------------------")
+        print("set up of UV")
+        self.setup_V(degree=degree)
+        # transform V to relevant space of T
+        V_in_eigenspace_T = np.dot(LT, np.dot(self.V, RT))
+        V_red = V_in_eigenspace_T[0:max_mode,0:max_mode]
+
+        # diagonalization of V_red, note: the above trafo eliminates O
+        EV_red, LV_red, RV_red = eig(V_red, left=True, right=True)
+        LV_red = LV_red.transpose().conjugate()
+        exp_V_half_red = np.exp(-1j*EV_red / (2.0 * self.hbar))
+        # normalize and test decomposition
+        RV_red, LV_red = self.normalize_RL(RV_red, LV_red)
+        self.test_normalization_RL(RV_red, LV_red)
+
+        # important note: the modes of V may grow, because the imaginary part
+        # of the complex rotated potential is not necessarily negative
+        print("maximal eigenvalue of UV_half:", abs(exp_V_half_red).max())
+        print("minimal eigenvalue of UV_half:", abs(exp_V_half_red).min())
+
+        # construct half kick evolution on reduced eigenspace of T
+        UV_half_red = np.dot(RV_red, np.dot(np.diag(exp_V_half_red), LV_red))
+        # construct half kick evolution on full coefficient space
+        UV_half = np.zeros((len(exp_T), len(exp_T)), dtype=complex)
+        UV_half[:max_mode, :max_mode] = UV_half_red
+        # projecting from eigenspace of T to the coefficient space
+        self.UV_half = np.dot(RT, np.dot(UV_half, np.dot(LT, self.O)))
+
+        # set up U ---------------------------------------------
+        print("------------------------------------------------")
+        print("set up of U")
+        # finally we set up the full U, first in the reduced eigenspace of T
+        U_red = np.dot(UV_half_red, np.dot(UT_red, UV_half_red))
+        # and lift it to the full coefficient space
+        U = np.zeros_like(self.UT)
+        U[:max_mode, :max_mode] = U_red.copy()
+        # projecting from eigenspace of T to the coefficient space
+        self.U = np.dot(RT, np.dot (U, np.dot(LT, self.O)))
+
+        # we further provide its eigenvectors and eigenvalues from the reduced
+        # space
+        evals_red, L_red, R_red = eig(U_red, left=True, right=True)
+        L_red = L_red.transpose().conjugate()
+        # normalize and test decomposition
+        R_red, L_red = self.normalize_RL(R_red, L_red)
+        self.test_normalization_RL(R_red, L_red)
+
+        # check the eigenvalues
+        print("maximal eigenvalue of U:", abs(evals_red).max())
+        print("minimal eigenvalue of U:", abs(evals_red).min())
+
+        i_sort = np.argsort(-abs(evals_red))
+        evals_red = evals_red[i_sort]
+        R_red = R_red[:,i_sort]
+        L_red = L_red[i_sort,:]
+
+        # construct solution on full coefficient space
+        self.evals = np.zeros(len(exp_T), dtype=complex)
+        self.evals[:max_mode] = evals_red
+        # right eigenvectors
+        R = np.diag(np.ones(len(exp_T), dtype=complex))
+        R[:max_mode, :max_mode] = R_red
+        self.R = np.dot(RT, R)
+        # left eigenvectors
+        L = np.diag(np.ones(len(exp_T), dtype=complex))
+        L[:max_mode, :max_mode] = L_red
+        self.L = np.dot(L, np.dot(LT, self.O))
+        self.test_normalization_RL(self.R, self.L)
