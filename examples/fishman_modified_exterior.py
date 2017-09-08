@@ -7,8 +7,7 @@ from __future__ import (division, print_function)
 import numpy as np
 from matplotlib import pylab as plt
 
-from FEM.core.convenient_function import recommended_N
-from FEM.systems.fishman_modified import Fishman
+from FEM.systems.fishman_modified_exterior import Fishman
 
 # testing stuff ---------------------------------------------------------
 
@@ -16,7 +15,7 @@ if __name__ == '__main__':
     """ Give some example which also serves as a test here.
     """
     # system parameters ---------------------------------------
-    kappa = 1.0
+    kappa=1.0
     states_per_cell = 5
     hbar = 1.0 / (2.0 * np.pi) / states_per_cell
 
@@ -26,14 +25,14 @@ if __name__ == '__main__':
     max_order = 5
     theta = 0.2
     x_max = 4.0
-    N = recommended_N(hbar, theta, 2.0*x_max)
+    p_max = 2.0
+    N = int(4 * p_max * x_max * states_per_cell)
+    print("Using grid points:", N)
 
     # initialize the fishmen map ----------------------------
     FM = Fishman(kappa, hbar, max_order, N, x_max, theta=theta,
                  dirichlet_bound_conds=False)
-    FM.generateU(method=0, degree=degree, degree2D=degree2D, eps=10**(-15),
-                 Oinv_fast=False, Oinv_max_eval=None, Oinv_show_modes=False,
-                 show_matrix=False)
+    FM.generateU(method=0, degree2D=degree2D, eps=10**(-5))
 
     FM.compute_evecs()
     FM.order_evecs()
