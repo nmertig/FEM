@@ -24,7 +24,7 @@ if __name__ == '__main__':
               dirichlet_bound_conds=True)
 
     # set up
-    BP.plot_V()
+    #BP.plot_V()
     BP.setup_O()
     BP.setup_T()
     BP.setup_V(degree=50)

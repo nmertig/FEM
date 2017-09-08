@@ -13,17 +13,12 @@ from __future__ import (division, print_function)
 import numpy as np
 from scipy.linalg import eig
 from FEM.core.fem_cell_legendre import FEM_Cell_Legendre
-from matplotlib import pylab as plt
 
 class FEM(object):
     """ H = - hbar*2 \Laplace on the domain x = [0,1]
     """
     def __init__(self, hbar, max_order, x_grid, theta=0.0,
-                 dirichlet_bound_conds=True,
-                 exterior_scaling=False,
-                 exterior_scaling_xmin=-1.0,
-                 exterior_scaling_xmax=1.0,
-                 exterior_scaling_mask=None):
+                 dirichlet_bound_conds=True):
         """
         """
         self.hbar = hbar
@@ -36,38 +31,19 @@ class FEM(object):
         self.dim = max_order * self.N_cell + 1
         self.dirichlet_bound_conds = dirichlet_bound_conds
 
-        # parameters related to exterior complex scaling
-        self.exterior_scaling = exterior_scaling
-        self.exterior_scaling_xmin = exterior_scaling_xmin
-        self.exterior_scaling_xmax = exterior_scaling_xmax
-        self.exterior_scaling_mask = exterior_scaling_mask
-
         # to be filled by setup
         self.O = None
         self.T = None
         self.V = None
         self.H = None
 
-    # Kinetic Energy and Potential ----------------------------------------
+    # the scaling path ----------------------------------------------------
     def scaling_path(self, x):
         """ this function contains the scaling path
         """
-        if self.exterior_scaling:
-            xmin = self.exterior_scaling_xmin
-            xmax = self.exterior_scaling_xmax
-            exp_theta = np.exp(1j*self.theta)
-            xl = x[x<xmin]
-            xc = x[(xmin<=x)*(x<=xmax)]
-            xr = x[xmax<x]
-            # map
-            sl = xmin + (xl - xmin) * exp_theta
-            sc = xc
-            sr = xmax + (xr - xmax) * exp_theta
-            return np.concatenate((np.concatenate((sl, sc)), sr))
+        return x * np.exp(1j*self.theta)
 
-        else:
-            return x*np.exp(1j*self.theta)
-
+    # Kinetic Energy and Potential ----------------------------------------
     def T_fct(self, x):
         """ kinetic energy
         """
@@ -87,20 +63,6 @@ class FEM(object):
         """ Potential after including the complex scaling Transformation
         """
         return self.V_fct(self.scaling_path(x))
-
-    def plot_V(self):
-        """
-        """
-        x = np.linspace(self.x_grid.min(), self.x_grid.max(), 1000)
-        fig = plt.figure(1)
-
-        # showing the result of the integration on a linear scale -------
-        ax1 = fig.add_subplot(111)
-        ax1.set_xscale('linear')
-        ax1.set_yscale('linear')
-        ax1.plot(x, self.V_fct_theta(x).real, 'b-', label=None)
-        ax1.plot(x, self.V_fct_theta(x).imag, 'r-', label=None)
-        plt.show()
 
     # #################################################################
     # q space representation of wave functions
@@ -140,7 +102,7 @@ class FEM(object):
         return coeff
 
     # #################################################################
-    # setup for autonomous problems
+    # setup of matrices
     # #################################################################
     def setup_O(self):
         """ Sets up the Overlapmatrix of the finite element representation.
@@ -151,14 +113,13 @@ class FEM(object):
             smin = self.x_grid[i]
             smax = self.x_grid[i+1]
             O_mat = self.FEM.Overlap_matrix(smin=smin, smax=smax)
-            # set the phase factor of complex scaling
-            if self.exterior_scaling:
-                if self.exterior_scaling_mask[i]:
-                    O_mat *= np.exp(1j*self.theta)
             O[i*max_order:(i+1)*max_order+1,i*max_order:(i+1)*max_order+1] +=\
                 O_mat
         self.O = O
 
+    # #################################################################
+    # setup of matrices (for autonomous problems)
+    # #################################################################
     def setup_T(self):
         """ Sets up the finite element representation of the overlap matrix.
         """
@@ -168,13 +129,7 @@ class FEM(object):
             smin = self.x_grid[i]
             smax = self.x_grid[i+1]
             L = self.FEM.Laplace_matrix(smin=smin, smax=smax)
-            # set the phase factor of complex scaling
-            if self.exterior_scaling:
-                if self.exterior_scaling_mask[i]:
-                    L *= np.exp(-1j*self.theta)
-            else:
-                L *= np.exp(-1j*2.0*self.theta)
-
+            L *= np.exp(-1j*2.0*self.theta)
             # put the resulting matrix
             T[i*max_order:(i+1)*max_order+1,i*max_order:(i+1)*max_order+1] +=\
                 -(0.5 * self.hbar**2) * L
@@ -192,15 +147,13 @@ class FEM(object):
                 Pot_mat = self.FEM.Potential_matrix(self.V_fct_theta,
                                                     smin=smin, smax=smax,
                                                     degree=degree)
-                # set the phase factor of complex scaling
-                if self.exterior_scaling:
-                    if self.exterior_scaling_mask[i]:
-                        Pot_mat *= np.exp(1j*self.theta)
                 V[i*max_order:(i+1)*max_order+1,
                   i*max_order:(i+1)*max_order+1] += Pot_mat
         self.V = V
 
     def setup_H(self):
+        """ Full matrix representation
+        """
         self.H = self.T + self.V
 
     # #################################################################

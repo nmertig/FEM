@@ -17,7 +17,7 @@ if __name__ == '__main__':
     N_cell = 40
     max_order = 10
     BP = Box_Potential(hbar, N_cell, max_order,
-                       dirichlet_bound_conds=False)
+                       dirichlet_bound_conds=True)
 
     # set up
     BP.setup_O()
